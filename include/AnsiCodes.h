@@ -28,7 +28,7 @@
 
 
 namespace EMU::Stuff{}
-
+namespace utl{
 template <typename... Args>
 void Print(const std::string_view &fmt, Args &&...args)
 {
@@ -58,6 +58,7 @@ constexpr std::array<char, 11> SetColor(int id)
     result[9] = '0' + ones;
 
     return result;
+}
 }
 namespace ansi {
 

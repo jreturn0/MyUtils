@@ -2,6 +2,7 @@
 #include <shared_mutex>
 #include <variant>
 #include <ranges>
+#include <mutex>
 #include "StackedSliceArray.h"
 
 enum class Type

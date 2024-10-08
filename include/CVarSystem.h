@@ -3,8 +3,9 @@
 #include <string_view>
 #include <array>
 #include <variant>
-
+#include <stdint.h>
 #include "StringHash.h"
+#include <limits>
 using namespace utl;
 enum class CVarFlags : uint32_t
 {

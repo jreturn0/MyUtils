@@ -1,5 +1,7 @@
 #pragma once
 #include <random>
+#include <algorithm>
+#include <ranges>
 namespace utl {
 	// Static functions to generate random number within a range
 	class RNG
@@ -29,7 +31,7 @@ namespace utl {
 		template<typename T>
 		static void Shuffle(T& container)
 		{
-			std::shuffle(container.begin(), container.end(), gen);
+			std::ranges::shuffle(container, gen);
 		}
 
 
