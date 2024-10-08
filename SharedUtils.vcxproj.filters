@@ -63,6 +63,9 @@
     <ClInclude Include="include\FSReader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\MyNamespace.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\FSNavigator.cpp">

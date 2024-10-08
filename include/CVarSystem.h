@@ -5,7 +5,7 @@
 #include <variant>
 
 #include "StringHash.h"
-
+using namespace utl;
 enum class CVarFlags : uint32_t
 {
 	None = 0,

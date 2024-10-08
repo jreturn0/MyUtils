@@ -79,7 +79,7 @@
     <IntDir>$(SolutionDir)intermediates\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
-    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgEnableManifest>false</VcpkgEnableManifest>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <VcpkgInstalledDir>$(SolutionDir)libs</VcpkgInstalledDir>
@@ -157,6 +157,7 @@
     <ClInclude Include="include\FSReader.h" />
     <ClInclude Include="include\Log.h" />
     <ClInclude Include="include\Logger.h" />
+    <ClInclude Include="include\MyNamespace.h" />
     <ClInclude Include="include\Profiler.h" />
     <ClInclude Include="include\RNG.h" />
     <ClInclude Include="include\StackedSliceArray.h" />

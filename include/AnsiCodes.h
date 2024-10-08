@@ -3,6 +3,32 @@
 #include <string>
 #include <format>
 #include <iostream>
+
+
+//EMU or Emu : EasedMango Utilities / Easy My Utils
+//Mu or MU : My Utils
+//MyUtils : My Utilities
+//myut : my utilities
+//utils : utilities
+//shutl : shared utilities
+//myts : my tools
+//Mutils : My Utilities
+//msut : my shared utilities
+//Imp : impetus, origin project of the project but not directly related to the project
+//mutl : my utilities
+//myutl : my utilities
+//mut : my utilities
+//sut : shared utilities
+//EMUtils : EasedMango Utilities
+//EMUtls : EasedMango Utilities
+//EMUt : EasedMango Utilities
+
+
+
+
+
+namespace EMU::Stuff{}
+
 template <typename... Args>
 void Print(const std::string_view &fmt, Args &&...args)
 {
