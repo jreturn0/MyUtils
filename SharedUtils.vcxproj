@@ -165,6 +165,10 @@
     <ClInclude Include="include\StringHash.h" />
     <ClInclude Include="include\MemUtils.h" />
     <ClInclude Include="include\Slice.h" />
+    <ClInclude Include="include\thirdparty\ini.h" />
+    <ClInclude Include="include\thirdparty\json.hpp" />
+    <ClInclude Include="include\thirdparty\json_fwd.hpp" />
+    <ClInclude Include="include\thirdparty\toml.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\FSReader.cpp" />
