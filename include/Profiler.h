@@ -2,10 +2,18 @@
 #include <algorithm>
 #include <unordered_map>
 #include <chrono>
+#include <iostream>
 #include <numeric>
 
 
 namespace utl {
+	inline std::string FormatWithCommas(const long long value)
+	{
+		std::ostringstream oss;
+		oss.imbue(std::locale("en_US.UTF-8"));
+		oss << value;
+		return oss.str();
+	}
 	struct TimeStats
 	{
 
@@ -31,6 +39,34 @@ namespace utl {
 			totalDuration = std::chrono::nanoseconds::min();
 			minDuration = std::chrono::nanoseconds::max();
 			maxDuration = std::chrono::nanoseconds::min();
+		}
+
+		void print() const
+		{
+			std::cout << "\tTotal: " << FormatWithCommas(totalDuration.count()) << "ns\n";
+			std::cout << "\tAverage: " << FormatWithCommas(averageDuration().count()) << "ns\n";
+			std::cout << "\tMin: " << FormatWithCommas(minDuration.count()) << "ns\n";
+			std::cout << "\tMax: " << FormatWithCommas(maxDuration.count()) << "ns\n";
+			std::cout << "\tCount: " << FormatWithCommas(counts) << "\n";
+		}
+		void print(std::ostream& os) const
+		{
+			os << "\tTotal: " << FormatWithCommas(totalDuration.count()) << "ns\n";
+			os << "\tAverage: " << FormatWithCommas(averageDuration().count()) << "ns\n";
+			os << "\tMin: " << FormatWithCommas(minDuration.count()) << "ns\n";
+			os << "\tMax: " << FormatWithCommas(maxDuration.count()) << "ns\n";
+			os << "\tCount: " << FormatWithCommas(counts) << "\n";
+		}
+
+		std::string toString() const
+		{
+			std::string str;
+			str += "\tTotal: " + FormatWithCommas(totalDuration.count()) + "ns\n";
+			str += "\tAverage: " + FormatWithCommas(averageDuration().count()) + "ns\n";
+			str += "\tMin: " + FormatWithCommas(minDuration.count()) + "ns\n";
+			str += "\tMax: " + FormatWithCommas(maxDuration.count()) + "ns\n";
+			str += "\tCount: " + FormatWithCommas(counts) + "\n";
+			return str;
 		}
 	};
 

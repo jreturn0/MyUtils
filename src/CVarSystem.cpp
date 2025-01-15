@@ -40,10 +40,9 @@ namespace utl {
 		size_t index;
 	};
 
-	std::pair<std::string,std::string> GetCVarInfoNameAndCategory(CVarInfo& info)
+	std::pair<std::string, std::string> GetCVarInfoNameAndCategory(CVarInfo& info)
 	{
-		if (auto c = info.name.find_first_of('.'); c != std::string::npos)
-		{
+		if (auto c = info.name.find_first_of('.'); c != std::string::npos) {
 			return { info.name.substr(c + 1),info.name.substr(0, c) };
 		}
 		return { info.name, "" };
@@ -133,6 +132,7 @@ namespace utl {
 		std::shared_mutex mutex;
 		std::unordered_map<uint64_t, CVarInfo> infoMap;
 		CVarPropertyArray<MAX_CVARS> properties;
+		//std::vector<CVarProperty*> cachedEditParameters;
 
 		//friend void from_json(const json& j, utl::CVarSystemImpl& cSys);
 
@@ -146,7 +146,7 @@ namespace utl {
 			info.name = name;
 			info.description = description;
 			info.type = type;
-			info.flags = CVarFlags::None;
+			info.flags = CVarFlagBits::None;
 			info.min = min;
 			info.max = max;
 			return &info;
@@ -154,7 +154,7 @@ namespace utl {
 
 	public:
 
-		CVarInfo* tryInitCVar(const std::string_view name,CVarValue initial, const std::string_view description, const   CVarType type, CVarFlags flags, const CVarMinMaxType min = std::monostate{}, const CVarMinMaxType max = std::monostate{})
+		CVarInfo* tryInitCVar(const std::string_view name, CVarValue initial, const std::string_view description, const   CVarType type, CVarFlags flags, const CVarMinMaxType min = std::monostate{}, const CVarMinMaxType max = std::monostate{})
 		{
 			auto hash = StringHash(name);
 			auto& info = infoMap[hash];
@@ -162,7 +162,7 @@ namespace utl {
 				info.name = name;
 				info.description = description;
 				info.type = type;
-				info.flags = CVarFlags::None;
+				info.flags = CVarFlagBits::None;
 				info.min = min;
 				info.max = max;
 				properties.add(initial, &info);
@@ -174,20 +174,27 @@ namespace utl {
 		CVarPropertyArray<MAX_CVARS>& getProperties() { return properties; }
 
 		CVarInfo* getCVar(StringHash<> name) override;
-		CVarInfo* createFloatCVar(std::string_view name, std::string_view description, 
-								  double initial, CVarFlags flags, double min, double max) override;
-		CVarInfo* createIntCVar(std::string_view name, std::string_view description, 
-								int64_t initial, CVarFlags flags, int64_t min, int64_t max) override;
-		CVarInfo* createBoolCVar(std::string_view name, std::string_view description, 
-								 bool initial, CVarFlags flags) override;
-		CVarInfo* createStringCVar(std::string_view name, std::string_view description, 
-								   std::string_view initial, CVarFlags flags) override;
-		CVarInfo* createVec2CVar(std::string_view name, std::string_view description, 
-								 Vec2 initial, CVarFlags flags, double min, double max) override;
-		CVarInfo* createVec3CVar(std::string_view name, std::string_view description, 
-								 Vec3 initial, CVarFlags flags, double min, double max) override;
-		CVarInfo* createVec4CVar(std::string_view name, std::string_view description, 
-								 Vec4 initial, CVarFlags flags, double min, double max) override;
+		CVarInfo* createFloatCVar(std::string_view name, double initial, std::string_view description,
+								  CVarFlags flags, double min, double max) override;
+
+		CVarInfo* createIntCVar(std::string_view name, int64_t initial, std::string_view description,
+								CVarFlags flags, int64_t min, int64_t max) override;
+
+		CVarInfo* createBoolCVar(std::string_view name, bool initial, std::string_view description,
+								 CVarFlags flags) override;
+
+		CVarInfo* createStringCVar(std::string_view name, std::string_view initial,
+								   std::string_view description, CVarFlags flags) override;
+
+		CVarInfo* createVec2CVar(std::string_view name, Vec2 initial, std::string_view description,
+								 CVarFlags flags, double min, double max) override;
+
+		CVarInfo* createVec3CVar(std::string_view name, Vec3 initial, std::string_view description,
+								 CVarFlags flags, double min, double max) override;
+
+		CVarInfo* createVec4CVar(std::string_view name, Vec4 initial, std::string_view description,
+								 CVarFlags flags, double min, double max) override;
+
 		void setFloatCVar(std::string_view name, double values) override;
 		void setIntCVar(std::string_view name, int64_t values) override;
 		void setBoolCVar(std::string_view name, bool values) override;
@@ -215,6 +222,9 @@ namespace utl {
 
 		void saveAsIni(std::string_view filename);
 		void loadFromIni(std::string_view filename);
+		void saveAsJson(std::string_view filename);
+		void loadFromJson(std::string_view filename);
+
 
 		void saveFile(std::string_view filename) override;;
 		void saveFile(FSNavigator& filename) override;;
@@ -333,25 +343,25 @@ namespace {
 
 			switch (type) {
 			case utl::CVarType::Bool:
-				cSys.createBoolCVar(key, value.at("description"),  std::get<bool>(val), value.at("flags"));
+				cSys.createBoolCVar(key, std::get<bool>(val), value.at("description"), value.at("flags"));
 				break;
 			case utl::CVarType::Int:
-				cSys.createIntCVar(key, value.at("description"),  std::get<int64_t>(val), value.at("flags"), std::get<int64_t>(min), std::get<int64_t>(max));
+				cSys.createIntCVar(key, std::get<int64_t>(val), value.at("description"), value.at("flags"), std::get<int64_t>(min), std::get<int64_t>(max));
 				break;
 			case utl::CVarType::Float:
-				cSys.createFloatCVar(key, value.at("description"),  std::get<double>(val), value.at("flags"), std::get<double>(min), std::get<double>(max));
+				cSys.createFloatCVar(key, std::get<double>(val), value.at("description"), value.at("flags"), std::get<double>(min), std::get<double>(max));
 				break;
 			case utl::CVarType::String:
-				cSys.createStringCVar(key, value.at("description"),  std::get<std::string>(val), value.at("flags"));
+				cSys.createStringCVar(key, std::get<std::string>(val), value.at("description"), value.at("flags"));
 				break;
 			case utl::CVarType::Vec2:
-				cSys.createVec2CVar(key, value.at("description"),  std::get<std::array<double, 2>>(val), value.at("flags"), std::get<double>(min), std::get<double>(max));
+				cSys.createVec2CVar(key, std::get<std::array<double, 2>>(val), value.at("description"), value.at("flags"), std::get<double>(min), std::get<double>(max));
 				break;
 			case utl::CVarType::Vec3:
-				cSys.createVec3CVar(key, value.at("description"),  std::get<std::array<double, 3>>(val), value.at("flags"), std::get<double>(min), std::get<double>(max));
+				cSys.createVec3CVar(key, std::get<std::array<double, 3>>(val), value.at("description"), value.at("flags"), std::get<double>(min), std::get<double>(max));
 				break;
 			case utl::CVarType::Vec4:
-				cSys.createVec4CVar(key, value.at("description"),  std::get<std::array<double, 4>>(val), value.at("flags"), std::get<double>(min), std::get<double>(max));
+				cSys.createVec4CVar(key, std::get<std::array<double, 4>>(val), value.at("description"), value.at("flags"), std::get<double>(min), std::get<double>(max));
 				break;
 			}
 		}
@@ -376,11 +386,11 @@ namespace utl {
 		return &instance;
 	}
 
-	CVarInfo* CVarSystemImpl::createFloatCVar(const std::string_view name, const std::string_view description,
-											  const  double initial, CVarFlags flags, double min, double max)
+	CVarInfo* CVarSystemImpl::createFloatCVar(std::string_view name, double initial, std::string_view description,
+											  CVarFlags flags, double min, double max)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::Float, flags, min, max);
+		CVarInfo* info = initCVar(name, description, CVarType::Float, flags, min, max);
 
 		if (!info) return nullptr;
 
@@ -390,11 +400,11 @@ namespace utl {
 
 	}
 
-	CVarInfo* CVarSystemImpl::createIntCVar(const std::string_view name, const std::string_view description, const 
-											int64_t initial, CVarFlags flags, int64_t min, int64_t max)
+	CVarInfo* CVarSystemImpl::createIntCVar(std::string_view name, int64_t initial, std::string_view description,
+											CVarFlags flags, int64_t min, int64_t max)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::Int, flags, min, max);
+		CVarInfo* info = initCVar(name, description, CVarType::Int, flags, min, max);
 
 		if (!info) return nullptr;
 
@@ -404,11 +414,11 @@ namespace utl {
 
 	}
 
-	CVarInfo* CVarSystemImpl::createBoolCVar(const std::string_view name, const std::string_view description, const 
-											 bool initial, CVarFlags flags)
+	CVarInfo* CVarSystemImpl::createBoolCVar(std::string_view name, bool initial, std::string_view description,
+											 CVarFlags flags)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::Bool, flags);
+		CVarInfo* info = initCVar(name, description, CVarType::Bool, flags);
 
 		if (!info) return nullptr;
 
@@ -417,11 +427,11 @@ namespace utl {
 		return info;
 	}
 
-	CVarInfo* CVarSystemImpl::createStringCVar(const std::string_view name, const std::string_view description,
-											   const std::string_view initial, CVarFlags flags)
+	CVarInfo* CVarSystemImpl::createStringCVar(std::string_view name, std::string_view initial,
+											   std::string_view description, CVarFlags flags)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::String, flags);
+		CVarInfo* info = initCVar(name, description, CVarType::String, flags);
 
 		if (!info) return nullptr;
 
@@ -430,11 +440,11 @@ namespace utl {
 		return info;
 	}
 
-	CVarInfo* CVarSystemImpl::createVec2CVar(const std::string_view name, const std::string_view description, const 
-											 Vec2 initial, CVarFlags flags, double min, double max)
+	CVarInfo* CVarSystemImpl::createVec2CVar(std::string_view name, Vec2 initial, std::string_view description,
+											 CVarFlags flags, double min, double max)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::Float, flags, min, max);
+		CVarInfo* info = initCVar(name, description, CVarType::Float, flags, min, max);
 
 		if (!info) return nullptr;
 
@@ -443,11 +453,11 @@ namespace utl {
 		return info;
 	}
 
-	CVarInfo* CVarSystemImpl::createVec3CVar(const std::string_view name, const std::string_view description, const 
-											 Vec3 initial, CVarFlags flags, double min, double max)
+	CVarInfo* CVarSystemImpl::createVec3CVar(std::string_view name, Vec3 initial, std::string_view description,
+											 CVarFlags flags, double min, double max)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::Float, flags, min, max);
+		CVarInfo* info = initCVar(name, description, CVarType::Float, flags, min, max);
 
 		if (!info) return nullptr;
 
@@ -456,11 +466,11 @@ namespace utl {
 		return info;
 	}
 
-	CVarInfo* CVarSystemImpl::createVec4CVar(const std::string_view name, const std::string_view description, const 
-											 Vec4 initial, CVarFlags flags, double min, double max)
+	CVarInfo* CVarSystemImpl::createVec4CVar(std::string_view name, Vec4 initial, std::string_view description,
+											 CVarFlags flags, double min, double max)
 	{
 		std::unique_lock lock(mutex);
-		CVarInfo* info = initCVar(name, description,  CVarType::Float, flags, min, max);
+		CVarInfo* info = initCVar(name, description, CVarType::Float, flags, min, max);
 
 		if (!info) return nullptr;
 
@@ -473,8 +483,8 @@ namespace utl {
 	{
 		const auto info = getCVar(StringHash(name));
 		if (!info) return;
-		const auto index = info->index;
-		properties.setCurrent(index, values);
+
+		properties.setCurrent(info->index, values);
 	}
 
 	void CVarSystemImpl::setIntCVar(const std::string_view name, int64_t values)
@@ -640,6 +650,15 @@ namespace utl {
 
 
 	}
+	bool isNumericVector(const std::string& str)
+	{
+		for (char c : str) {
+			if (!std::isdigit(c) && c != '.' && c != '-' && c != ',') {
+				return false;
+			}
+		}
+		return true;
+	}
 	void CVarSystemImpl::loadFromIni(std::string_view filename)
 	{
 
@@ -662,12 +681,15 @@ namespace utl {
 				utl::CVarType type;
 				utl::CVarMinMaxType min, max;
 
+				// Helper function to check if a string represents a numeric vector (with commas)
+
+
 				// Deduce type and assign value
 				if (valueStr == "true" || valueStr == "false") {
 					val = (valueStr == "true");
 					type = utl::CVarType::Bool;
-					this->createBoolCVar( std::string(category).append(".")+ name, "",  std::get<bool>(val), {});
-				} else if (std::count(valueStr.begin(), valueStr.end(), ',') > 0) {
+					this->createBoolCVar(std::string(category).append(".") + name, std::get<bool>(val), "", {});
+				} else if (std::ranges::count(valueStr, ',') > 0 && isNumericVector(valueStr)) {
 					std::istringstream ss(valueStr);
 					std::vector<double> values;
 					std::string item;
@@ -679,48 +701,37 @@ namespace utl {
 					if (values.size() == 2) {
 						val = std::array<double, 2>{values[0], values[1]};
 						type = utl::CVarType::Vec2;
-						this->createVec2CVar(std::string(category).append(".") + name, "",  std::get<std::array<double, 2>>(val), {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());  // replace with actual min/max if applicable
+						this->createVec2CVar(std::string(category).append(".") + name, std::get<std::array<double, 2>>(val), "", {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
 					} else if (values.size() == 3) {
 						val = std::array<double, 3>{values[0], values[1], values[2]};
 						type = utl::CVarType::Vec3;
-						this->createVec3CVar(std::string(category).append(".") + name, "",  std::get<std::array<double, 3>>(val), {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
+						this->createVec3CVar(std::string(category).append(".") + name, std::get<std::array<double, 3>>(val), "", {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
 					} else if (values.size() == 4) {
 						val = std::array<double, 4>{values[0], values[1], values[2], values[3]};
 						type = utl::CVarType::Vec4;
-						this->createVec4CVar(std::string(category).append(".") + name, "",  std::get<std::array<double, 4>>(val), {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
+						this->createVec4CVar(std::string(category).append(".") + name, std::get<std::array<double, 4>>(val), "", {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
 					}
 				} else if (valueStr.find('.') != std::string::npos) {
 					val = std::stod(valueStr);
 					type = utl::CVarType::Float;
-					this->createFloatCVar(std::string(category).append(".") + name, "",  std::get<double>(val), {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
+					this->createFloatCVar(std::string(category).append(".") + name, std::get<double>(val), "", {}, std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
 				} else {
 					try {
 						val = std::stoll(valueStr);
 						type = utl::CVarType::Int;
-						this->createIntCVar(std::string(category).append(".") + name, "",  std::get<int64_t>(val), {}, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max());  // replace with actual min/max if applicable
+						this->createIntCVar(std::string(category).append(".") + name, std::get<int64_t>(val), "", {}, std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max());
 					} catch (...) {
 						val = valueStr;
 						type = utl::CVarType::String;
-						this->createStringCVar(std::string(category).append(".") + name, "",  std::get<std::string>(val), {});
+						this->createStringCVar(std::string(category).append(".") + name, std::get<std::string>(val), "", {});
 					}
 				}
 			}
 		}
 	}
 
-	bool iniOrJson(std::string_view filename)
+	void CVarSystemImpl::saveAsJson(std::string_view filename)
 	{
-		return filename.find(".ini") != std::string::npos;
-	}
-	void CVarSystemImpl::saveFile(std::string_view filename)
-	{
-		//handle mutex
-		std::shared_lock lock(mutex);
-		bool isIni = iniOrJson(filename);
-		if (isIni) {
-			saveAsIni(filename);
-			return;
-		}
 		std::string filenameStr = std::string(filename);
 		if (filenameStr.find(".json") == std::string::npos) {
 			filenameStr += ".json";
@@ -736,6 +747,50 @@ namespace utl {
 		file << j.dump(4);
 	}
 
+	void CVarSystemImpl::loadFromJson(std::string_view filename)
+	{
+		std::string filenameStr = std::string(filename);
+		if (filenameStr.find(".json") == std::string::npos) {
+			filenameStr += ".json";
+		}
+
+		json j;
+		std::ifstream file{ filenameStr };
+
+		if (!file.is_open()) {
+			throw std::runtime_error("Could not open file for reading");
+		}
+
+		// Check if file is empty
+		if (file.peek() == std::ifstream::traits_type::eof()) {
+			// File exists but is empty
+			printf("File is empty\n");
+			return;
+		}
+
+		// Parse JSON content
+		file >> j;
+		CVarSystemImpl& cvSys = *this;
+		from_json(j, cvSys);
+	}
+
+
+	bool iniOrJson(std::string_view filename)
+	{
+		return filename.find(".ini") != std::string::npos;
+	}
+	void CVarSystemImpl::saveFile(std::string_view filename)
+	{
+		//handle mutex
+		std::shared_lock lock(mutex);
+		if (iniOrJson(filename)) {
+			saveAsIni(filename);
+			return;
+		}
+		saveAsJson(filename);
+
+	}
+
 	void CVarSystemImpl::saveFile(FSNavigator& filename)
 	{
 		auto path = filename.getFilePath(filename.getSelectedFile().value_or("")).string();
@@ -746,22 +801,12 @@ namespace utl {
 	void CVarSystemImpl::loadFile(std::string_view filename)
 	{
 		//std::unique_lock lock(mutex);
-		if (bool isIni = iniOrJson(filename)) {
+		if (iniOrJson(filename)) {
 			loadFromIni(filename);
 			return;
 		}
-		std::string filenameStr = std::string(filename);
-		if (filenameStr.find(".json") == std::string::npos) {
-			filenameStr += ".json";
-		}
-		json j;
-		std::ifstream file{ filenameStr };
-		if (!file.is_open()) {
-			throw std::runtime_error("Could not open file for reading");
-		}
-		file >> j;
-		CVarSystemImpl& cvSys = *this;
-		from_json(j, cvSys);
+		loadFromJson(filename);
+
 
 
 	}
@@ -780,7 +825,7 @@ namespace utl {
 		for (const auto& property : properties) {
 			auto& info = *property.info;
 			auto nameAndCategory = GetCVarInfoNameAndCategory(info);
-			std::cout << "Property [" << nameAndCategory.second << "][" << nameAndCategory.first<< "] = ";
+			std::cout << "Property [" << nameAndCategory.second << "][" << nameAndCategory.first << "] = ";
 
 			std::visit([](auto&& arg) {
 				using T = std::decay_t<decltype(arg)>;
@@ -805,16 +850,15 @@ namespace utl {
 	}
 
 
-	AutoCVar_Float::AutoCVar_Float(std::string_view name, double initial,  std::string_view description,
+	AutoCVar_Float::AutoCVar_Float(std::string_view name, double initial, std::string_view description,
 								   CVarFlags flags, double min, double max)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		auto* info = cvSys.getCVar(name);
-		if (info) {
+		if (auto* info = cvSys.getCVar(name); info != nullptr) {
 			index = info->index;
 			return;
 		}
-		index = cvSys.createFloatCVar(name, description,  initial, flags, min, max)->index;
+		index = cvSys.createFloatCVar(name, initial, description, flags, min, max)->index;
 
 	}
 
@@ -845,38 +889,44 @@ namespace utl {
 		CVarSystemImpl::Get()->getProperties().setCurrent(index, val);
 	}
 
-	AutoCVar_Int::AutoCVar_Int(std::string_view name, int64_t initial,  std::string_view description,
+	AutoCVar_Int::AutoCVar_Int(std::string_view name, int64_t initial, std::string_view description,
 							   CVarFlags flags, int64_t min, int64_t max)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		if (auto* info = cvSys.getCVar(name)) {
-			index = info->index;
-			if (info->type != utl::CVarType::Int) {
-				throw std::runtime_error("CVar type mismatch");
-			}
-			const auto flag = static_cast<int64_t>(info->flags);
-			const auto isReadOnly = flag & static_cast<int64_t>(CVarFlags::EditReadOnly);
-			const auto isDontOverwriteOnLoad = flag & static_cast<int64_t>(CVarFlags::DontOverwriteOnLoad);
+		const auto* info = cvSys.getCVar(name);
 
-			if (!isReadOnly || !isDontOverwriteOnLoad )
-			{
-				cvSys.setIntCVar(name, initial);
-			}
+		if (info == nullptr) {
+			index = cvSys.createIntCVar(name, initial, description, flags, min, max)->index;
 			return;
 		}
-		index = cvSys.createIntCVar(name, description,  initial, flags, min, max)->index;
+		if (info->type != utl::CVarType::Int) {
+			throw std::runtime_error("CVar type mismatch");
+		}
+
+		if (info->flags & (CVarFlagBits::NoAutoLoad | CVarFlagBits::Volatile)) {
+			cvSys.setIntCVar(name, initial);
+		}
+		index = info->index;
 	}
 
-	AutoCVar_Bool::AutoCVar_Bool(std::string_view name, bool initial,  std::string_view description,
+	AutoCVar_Bool::AutoCVar_Bool(std::string_view name, bool initial, std::string_view description,
 								 CVarFlags flags)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		auto* info = cvSys.getCVar(name);
-		if (info) {
-			index = info->index;
+		const auto* info = cvSys.getCVar(name);
+
+		if (info == nullptr) {
+			index = cvSys.createBoolCVar(name, initial, description, flags)->index;
 			return;
 		}
-		index = cvSys.createBoolCVar(name, description,  initial, flags)->index;
+		if (info->type != utl::CVarType::Int) {
+			throw std::runtime_error("CVar type mismatch");
+		}
+
+		if (info->flags & (CVarFlagBits::NoAutoLoad | CVarFlagBits::Volatile)) {
+			cvSys.setBoolCVar(name, initial);
+		}
+		index = info->index;
 	}
 
 	bool AutoCVar_Bool::get() const
@@ -896,15 +946,23 @@ namespace utl {
 		CVarSystemImpl::Get()->getProperties().setCurrent(index, val);
 	}
 
-	AutoCVar_String::AutoCVar_String(std::string_view name, std::string_view initial,  std::string_view description, CVarFlags flags)
+	AutoCVar_String::AutoCVar_String(std::string_view name, std::string_view initial, std::string_view description, CVarFlags flags)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		auto* info = cvSys.getCVar(name);
-		if (info) {
-			index = info->index;
+		const auto* info = cvSys.getCVar(name);
+
+		if (info == nullptr) {
+			index = cvSys.createStringCVar(name, initial, description, flags)->index;
 			return;
 		}
-		index = cvSys.createStringCVar(name, description,  initial, flags)->index;
+		if (info->type != utl::CVarType::Int) {
+			throw std::runtime_error("CVar type mismatch");
+		}
+
+		if (info->flags & (CVarFlagBits::NoAutoLoad | CVarFlagBits::Volatile)) {
+			cvSys.setStringCVar(name, initial);
+		}
+		index = info->index;
 	}
 
 	std::string_view AutoCVar_String::get() const
@@ -917,16 +975,24 @@ namespace utl {
 		CVarSystemImpl::Get()->getProperties().setCurrent(index, std::string(val));
 	}
 
-	AutoCVar_Vec2::AutoCVar_Vec2(std::string_view name, CVarSystem::Vec2 initial,  std::string_view description,
+	AutoCVar_Vec2::AutoCVar_Vec2(std::string_view name, CVarSystem::Vec2 initial, std::string_view description,
 								 CVarFlags flags, double min, double max)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		auto* info = cvSys.getCVar(name);
-		if (info) {
-			index = info->index;
+		const auto* info = cvSys.getCVar(name);
+
+		if (info == nullptr) {
+			index = cvSys.createVec2CVar(name, initial, description, flags, min, max)->index;
 			return;
 		}
-		index = cvSys.createVec2CVar(name, description,  initial, flags, min, max)->index;
+		if (info->type != utl::CVarType::Int) {
+			throw std::runtime_error("CVar type mismatch");
+		}
+
+		if (info->flags & (CVarFlagBits::NoAutoLoad | CVarFlagBits::Volatile)) {
+			cvSys.setVec2CVar(name, initial);
+		}
+		index = info->index;
 	}
 
 
@@ -947,28 +1013,44 @@ namespace utl {
 		CVarSystemImpl::Get()->getProperties().setCurrent(index, val);
 	}
 
-	AutoCVar_Vec3::AutoCVar_Vec3(std::string_view name, const CVarSystem::Vec3& initial,  std::string_view description,
+	AutoCVar_Vec3::AutoCVar_Vec3(std::string_view name, const CVarSystem::Vec3& initial, std::string_view description,
 								 CVarFlags flags, double min, double max)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		auto* info = cvSys.getCVar(name);
-		if (info) {
-			index = info->index;
+		const auto* info = cvSys.getCVar(name);
+
+		if (info == nullptr) {
+			index = cvSys.createVec3CVar(name, initial, description, flags, min, max)->index;
 			return;
 		}
-		index = cvSys.createVec3CVar(name, description,  initial, flags, min, max)->index;
+		if (info->type != utl::CVarType::Int) {
+			throw std::runtime_error("CVar type mismatch");
+		}
+
+		if (info->flags & (CVarFlagBits::NoAutoLoad | CVarFlagBits::Volatile)) {
+			cvSys.setVec3CVar(name, initial);
+		}
+		index = info->index;
 	}
 
-	AutoCVar_Vec4::AutoCVar_Vec4(std::string_view name, const CVarSystem::Vec4& initial,  std::string_view description,
+	AutoCVar_Vec4::AutoCVar_Vec4(std::string_view name, const CVarSystem::Vec4& initial, std::string_view description,
 								 CVarFlags flags, double min, double max)
 	{
 		auto& cvSys = *CVarSystemImpl::Get();
-		auto* info = cvSys.getCVar(name);
-		if (info) {
-			index = info->index;
+		const auto* info = cvSys.getCVar(name);
+
+		if (info == nullptr) {
+			index = cvSys.createVec4CVar(name, initial, description, flags, min, max)->index;
 			return;
 		}
-		index = cvSys.createVec4CVar(name, description,  initial, flags, min, max)->index;
+		if (info->type != utl::CVarType::Int) {
+			throw std::runtime_error("CVar type mismatch");
+		}
+
+		if (info->flags & (CVarFlagBits::NoAutoLoad | CVarFlagBits::Volatile)) {
+			cvSys.setVec4CVar(name, initial);
+		}
+		index = info->index;
 	}
 
 	CVarSystem::Vec4 AutoCVar_Vec4::get()const
