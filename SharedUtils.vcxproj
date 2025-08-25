@@ -148,9 +148,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\ConfigFIle.h" />
+    <ClInclude Include="include\ConfigSystem.h" />
     <ClInclude Include="include\AnsiCodes.h" />
+    <ClInclude Include="include\BitFlags.h" />
     <ClInclude Include="include\CVarSystem.h" />
     <ClInclude Include="include\Debug.h" />
+    <ClInclude Include="include\Event.h" />
     <ClInclude Include="include\FSNavigator.h" />
     <ClInclude Include="include\FixedQueue.h" />
     <ClInclude Include="include\FreeList.h" />
@@ -171,6 +175,7 @@
     <ClInclude Include="include\thirdparty\toml.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\ConfigSystem.cpp" />
     <ClCompile Include="src\FSReader.cpp" />
     <ClCompile Include="src\CVarSystem.cpp" />
     <ClCompile Include="src\Profiler.cpp" />
