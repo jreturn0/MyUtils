@@ -36,6 +36,18 @@ namespace utl {
 	using ConfigValue = std::variant<bool, std::string, int64_t, double>;
 
 
+	std::string toString(const ConfigValueType type) {
+		switch (type) {
+		case ConfigValueType::Bool: return "Bool";
+		case ConfigValueType::String: return "String";
+		case ConfigValueType::Int: return "Int";
+		case ConfigValueType::Double: return "Double";
+		default: return "Unknown";
+
+		}
+	};
+
+
 	//Check if T is a supported ConfigValue type
 	template <typename T>
 	concept ConfigValueTypeIsSupported =
@@ -73,6 +85,8 @@ namespace utl {
 	}
 
 
+	
+
 
 
 	// Simple config file parser and writer
@@ -85,6 +99,52 @@ namespace utl {
 			std::string name;
 		};
 
+
+		ConfigFile(std::string_view filename);
+
+		void save();
+		void load();
+
+
+
+		/// <summary>
+		/// Creates a configuration value with the specified name, default value, type, and flags.
+		/// </summary>
+		/// <param name="name">The name of the configuration value.</param>
+		/// <param name="defaultValue">The default value to assign if no value is set.</param>
+		/// <param name="type">The type of the configuration value. It MUST be the same as the types stored in ConfigValue</param>
+		/// <param name="flags">Flags that specify additional properties for the configuration value. Defaults to ConfigFlagBits::archive.</param>
+		/// <returns>The unique identifier (index) of the created configuration value.</returns>
+		size_t createValue(std::string_view name, const ConfigValue& defaultValue, const ConfigValueType& type, ConfigFlags flags = ConfigFlagBits::archive);
+
+
+		/// <summary>
+		///  Creates a configuration value with the specified name, default value, and flags.
+		/// </summary>
+		/// <param name="name">The name of the configuration value.</param>
+		/// <param name="defaultValue">The default value to assign if the configuration value does not exist.</param>
+		/// <param name="flags">Flags that control the behavior of the configuration value. Defaults to ConfigFlagBits::archive.</param>
+		/// <returns>The unique identifier (index) of the created configuration value.</returns>
+		size_t createValue(std::string_view name, const ConfigValue& defaultValue, ConfigFlags flags = ConfigFlagBits::archive);
+
+
+		bool hasValue(StringHash hash) const noexcept {
+			std::shared_lock lock(m_mutex);
+			return m_valueInfoMap.contains(hash);
+		}
+
+
+
+
+
+
+
+
+		//--- Templated methods ---//
+
+
+
+
 		template<ConfigValueTypeIsSupported T>
 		size_t createValue(std::string_view name, const T& defaultValue, ConfigFlags flags = ConfigFlagBits::archive) {
 			std::unique_lock lock(m_mutex);
@@ -93,6 +153,25 @@ namespace utl {
 			m_valueInfoMap[StringHash(name)] = { index, getConfigValueType<T>(), flags, std::string(name) };
 			return index;
 		}
+
+
+		// Various getters 
+		template<ConfigValueTypeIsSupported T>
+		bool tryGetValue(StringHash hash, T& out) const {
+			std::shared_lock lock(m_mutex);
+			auto it = m_valueInfoMap.find(hash);
+			if (it == m_valueInfoMap.end()) return false;
+			const size_t idx = it->second.index;
+			if (idx >= m_values.size()) return false; // corrupted index
+			// Type check
+			constexpr ConfigValueType expected = getConfigValueType<T>();
+			if (it->second.type != expected) return false;
+
+			out = getConfigValue<T>(m_values[idx]);
+			return true;
+		}
+
+
 
 
 		// Set value by name hash. Returns false if not found or type mismatch
@@ -114,29 +193,6 @@ namespace utl {
 			return false;
 		}
 
-
-		bool hasValue(StringHash hash) const noexcept {
-			std::shared_lock lock(m_mutex);
-			return m_valueInfoMap.contains(hash);
-		}
-
-
-		// Various getters 
-		template<ConfigValueTypeIsSupported T>
-		bool tryGetValue(StringHash hash, T& out) const {
-			std::shared_lock lock(m_mutex);
-			auto it = m_valueInfoMap.find(hash);
-			if (it == m_valueInfoMap.end()) return false;
-			const size_t idx = it->second.index;
-			if (idx >= m_values.size()) return false; // corrupted index
-			// Type check
-			constexpr ConfigValueType expected = getConfigValueType<T>();
-			if (it->second.type != expected) return false;
-
-			out = getConfigValue<T>(m_values[idx]);
-			return true;
-		}
-
 		// Get pointer to value, or nullptr if not found or type mismatch
 		template<ConfigValueTypeIsSupported T>
 		const T* getValuePtr(StringHash hash) {
@@ -151,6 +207,7 @@ namespace utl {
 			return &getConfigValue<T>(m_values[idx]);
 		}
 
+		// Get value by index, returns false if index out of range
 		template<ConfigValueTypeIsSupported T>
 		bool tryGetValueByIndex(size_t index, T& out) const {
 			std::shared_lock lock(m_mutex);
@@ -159,8 +216,6 @@ namespace utl {
 			return true;
 		}
 
-
-		// Strict accessor: asserts in debug, returns T (still returns fallback in release if missing).
 		template<ConfigValueTypeIsSupported T>
 		T getValue(StringHash hash) const {
 			T v{};
@@ -169,16 +224,23 @@ namespace utl {
 			return ok ? v : T{};
 		}
 
-		
+
 
 
 	private:
+		inline void logError(const std::string& msg) const {
+#ifdef CONFIG_FILE_ERROR_LOGGING
+			std::cerr << "ConfigFile Error: " << msg << "\n";
+#endif
+		}
 
+		std::string m_filename;
 		//Hashmap of section+key to valueConfigValueInfo
 		std::unordered_map<uint64_t, ConfigValueInfo> m_valueInfoMap{};
 		std::vector<ConfigValue> m_values{};
 		mutable std::shared_mutex m_mutex{};
 	};
+
 
 
 } // namespace utl

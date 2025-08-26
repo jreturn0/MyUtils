@@ -87,7 +87,7 @@
     <ClInclude Include="include\Event.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\ConfigFIle.h">
+    <ClInclude Include="include\ConfigFile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -111,6 +111,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\ConfigSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ConfigFile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -148,7 +148,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="include\ConfigFIle.h" />
+    <ClInclude Include="include\ConfigFile.h" />
     <ClInclude Include="include\ConfigSystem.h" />
     <ClInclude Include="include\AnsiCodes.h" />
     <ClInclude Include="include\BitFlags.h" />
@@ -175,6 +175,7 @@
     <ClInclude Include="include\thirdparty\toml.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\ConfigFile.cpp" />
     <ClCompile Include="src\ConfigSystem.cpp" />
     <ClCompile Include="src\FSReader.cpp" />
     <ClCompile Include="src\CVarSystem.cpp" />
