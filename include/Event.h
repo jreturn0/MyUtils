@@ -1,301 +1,158 @@
 #pragma once
-#include <functional>
-#include <vector>
-#include <shared_mutex>
-#include <memory>
-#include <thread>
-#include <future>
-#include <list>
-#include <mutex>
+
 #include <atomic>
-#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <shared_mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace utl {
 
+    template <typename... Args>
+    class EventHandler {
+    public:
+        using FuncType = std::function<void(Args...)>;
+        using IdType = std::uint64_t;
 
-	template<typename... Args>
-	class EventHandler {
-	public:
-		using HandlerFuncType = std::function<void(Args...)>;
-		using HandlerIdType = uint64_t;
+        explicit EventHandler(const FuncType& handlerFunc)
+            : m_handlerFunc(handlerFunc) {
+            m_handlerId = m_handlerIdCounter.fetch_add(1, std::memory_order_relaxed) + 1;
+        }
 
-		explicit EventHandler(const HandlerFuncType& handlerFunc)
-			: m_handlerFunc(handlerFunc)
-		{
-			m_handlerId = m_handlerIdCounter.fetch_add(1);
-		}
-		// Copy constructor
-		EventHandler(const EventHandler& src) : m_handlerFunc(src.m_handlerFunc), m_handlerId(src.m_handlerId) {}
+        explicit EventHandler(FuncType&& handlerFunc)
+            : m_handlerFunc(std::move(handlerFunc)) {
+            m_handlerId = m_handlerIdCounter.fetch_add(1, std::memory_order_relaxed) + 1;
+        }
 
-		// Move constructor
-		EventHandler(EventHandler&& src) noexcept : m_handlerFunc(std::move(src.m_handlerFunc)), m_handlerId(src.m_handlerId) {}
+        EventHandler(const EventHandler&) = default;
+        EventHandler(EventHandler&&) noexcept = default;
+        EventHandler& operator=(const EventHandler&) = default;
+        EventHandler& operator=(EventHandler&&) noexcept = default;
 
-		// Copy assignment operator
-		EventHandler& operator=(const EventHandler& src)
-		{
-			if (this != &src) {
-				m_handlerFunc = src.m_handlerFunc;
-				m_handlerId = src.m_handlerId;
-			}
-			return *this;
-		}
+        void operator()(Args... params) const {
+            if (m_handlerFunc) {
+                m_handlerFunc(std::forward<Args>(params)...);
+            }
+        }
 
+        bool operator==(const EventHandler& other) const noexcept {
+            return m_handlerId == other.m_handlerId;
+        }
 
-		// Move assignment operator
-		EventHandler& operator=(EventHandler&& src)
-		{
-			if (this != &src) {
-				m_handlerFunc = std::move(src.m_handlerFunc);
-				m_handlerId = src.m_handlerId;
-			}
-			return *this;
-		}
+        IdType getId() const noexcept { return m_handlerId; }
 
-		// Function call operator
+    private:
+        FuncType m_handlerFunc;
+        IdType m_handlerId{ 0 };
+        inline static std::atomic<IdType> m_handlerIdCounter{ 0 };
+    };
 
-		void operator()(Args... params) const
-		{
-			if (m_handlerFunc)
-			{
-				m_handlerFunc(params...);
-			}
-		}
+    template <typename... Args>
+    class Event : public std::enable_shared_from_this<Event<Args...>> {
+    public:
+        using HandlerType = EventHandler<Args...>;
+        using HandlerCollectionType = std::vector<HandlerType>;
+        using HandlerIndexMapType = std::unordered_map<typename HandlerType::IdType, std::size_t>;
 
-		// Equality operator 
-		bool operator==(const EventHandler& other) const
-		{
-			return m_handlerId == other.m_handlerId;
-		}
+        class Connection {
+        public:
+            using Id = typename HandlerType::IdType;
+            friend class Event<Args...>;
 
-		// Get the unique handler ID
-		HandlerIdType id() const
-		{
-			return m_handlerId;
-		}
+            Connection() = default;
+            ~Connection() { disconnect(); }
 
-	private:
-		HandlerFuncType m_handlerFunc;
-		HandlerIdType m_handlerId{ 0 };
-		inline static std::atomic_uint64_t m_handlerIdCounter = (0);
-	};
+            Connection(const Connection&) = delete;
+            Connection& operator=(const Connection&) = delete;
 
-	template<typename... Args>
-	class Event {
-	public:
-		using HandlerType = EventHandler<Args...>;
+            Connection(Connection&& other) noexcept { *this = std::move(other); }
 
-		// RAII connection (auto-disconnect)
-		class Connection {
-		public:
-			using Id = typename HandlerType::HandlerIdType;
+            Connection& operator=(Connection&& other) noexcept {
+                if (this != &other) {
+                    disconnect();
+                    m_event = std::move(other.m_event);
+                    m_handlerId = other.m_handlerId;
+                    other.m_handlerId = 0;
+                }
+                return *this;
+            }
 
-			Connection() = default;
-			Connection(Event* ev, Id id) : m_event(ev), m_id(id) {}
-			~Connection() { disconnect(); }
+            bool disconnect() {
+                if (auto sp = m_event.lock()) {
+                    const bool removed = sp->removeImpl(m_handlerId);
+                    if (removed) {
+                        m_event.reset();
+                        m_handlerId = 0;
+                    }
+                    return removed;
+                }
+                return false;
+            }
 
-			Connection(const Connection&) = delete;
-			Connection& operator=(const Connection&) = delete;
+            bool isConnected() const { return !m_event.expired() && m_handlerId != 0; }
 
-			Connection(Connection&& other) noexcept { *this = std::move(other); }
-			Connection& operator=(Connection&& other) noexcept {
-				if (this != &other) {
-					disconnect();
-					m_event = other.m_event;
-					m_id = other.m_id;
-					other.m_event = nullptr;
-					other.m_id = 0;
-				}
-				return *this;
-			}
+        private:
+            Connection(const std::shared_ptr<Event>& event, Id handlerId)
+                : m_event(event), m_handlerId(handlerId) {
+            }
 
-			bool disconnect() {
-				if (m_event && m_id) {
-					bool removed = m_event->removeId(m_id);
-					m_event = nullptr;
-					m_id = 0;
-					return removed;
-				}
-				return false;
-			}
+            std::weak_ptr<Event> m_event;
+            Id m_handlerId{ 0 };
+        };
 
-			bool valid() const noexcept { return m_event != nullptr; }
-			Id   id() const noexcept { return m_id; }
+        Event() = default;
 
-		private:
-			Event* m_event{ nullptr };
-			Id     m_id{ 0 };
-		};
+        Connection connect(const typename HandlerType::FuncType& handler) {
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+            auto id = addImpl(handler);
+            return Connection{ this->shared_from_this(), id };
+        }
 
-		// RAII connect
-		[[nodiscard]] Connection connect(const typename HandlerType::HandlerFuncType& func) {
-			return Connection(this, add(func));
-		}
+        void operator()(Args... params) const {
+            std::shared_lock<std::shared_mutex> lock(m_mutex);
+            for (const auto& handler : m_handlers) {
+                handler(std::forward<Args>(params)...);
+            }
+        }
 
-		// Default constructor
-		Event() {};
+    private:
+        typename HandlerType::IdType addImpl(const typename HandlerType::FuncType& handler) {
+            HandlerType eventHandler(handler);
+            const auto id = eventHandler.getId();
 
-		// Copy constructor
-		Event(const Event& src) {
-			std::shared_lock lock(src.m_handlersLocker);
-			m_handlers = src.m_handlers;
-		}
+            m_handlers.push_back(std::move(eventHandler));
+            m_handlerIndexMap[id] = m_handlers.size() - 1;
 
-		// Move constructor
-		Event(Event&& src) {
-			std::lock_guard lock(src.m_handlersLocker);
-			m_handlers = std::move(src.m_handlers);
-		}
+            return id;
+        }
 
-		// Copy assignment operator
-		Event& operator=(const Event& src) {
+        bool removeImpl(typename HandlerType::IdType handlerId) {
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
 
-			std::scoped_lock lock(m_handlersLocker, src.m_handlersLocker);
-			m_handlers = src.m_handlers;
-			return *this;
-		}
+            auto it = m_handlerIndexMap.find(handlerId);
+            if (it == m_handlerIndexMap.end()) {
+                return false;
+            }
 
-		// Move assignment operator
-		Event& operator=(Event&& src) {
-			std::scoped_lock lock(m_handlersLocker, src.m_handlersLocker);
-			std::swap(m_handlers, src.m_handlers);
-			return *this;
-		}
-		// Add a new handler, returns the handler ID
-		[[nodiscard]] HandlerType::HandlerIdType add(const HandlerType& handler)
-		{
-			std::unique_lock lock(m_handlersLocker);
-			m_handlers.emplace_back(handler);
-			return handler.id();
-		}
+            const std::size_t index = it->second;
+            const std::size_t last = m_handlers.size() - 1;
 
-		[[nodiscard]] HandlerType::HandlerIdType addOnce(const typename HandlerType::HandlerFuncType& func) {
-			auto eventPtr = this; // capture "this" safely
+            if (index != last) {
+                std::swap(m_handlers[index], m_handlers[last]);
+                m_handlerIndexMap[m_handlers[index].getId()] = index;
+            }
 
-			// Shared pointer to the handler ID so we can capture it inside the lambda
-			auto handlerIdPtr = std::make_shared<HandlerType::HandlerIdType>(0);
+            m_handlers.pop_back();
+            m_handlerIndexMap.erase(it);
 
-			HandlerType wrappedHandler{
-				[eventPtr, handlerIdPtr, func](Args... args) mutable {
-					func(args...);                     // Call actual user function
-					eventPtr->removeId(*handlerIdPtr); // Remove self after first call
-				}
-			};
+            return true;
+        }
 
-			*handlerIdPtr = wrappedHandler.id(); // Set the ID after creation
+        HandlerCollectionType m_handlers;
+        HandlerIndexMapType m_handlerIndexMap;
+        mutable std::shared_mutex m_mutex;
+    };
 
-			return add(std::move(wrappedHandler));
-		}
-
-		// Add a new handler from a function, returns the handler ID
-		[[nodiscard]] inline HandlerType::HandlerIdType add(const HandlerType::HandlerFuncType& handler) {
-			return add(HandlerType(handler));
-		}
-		// Remove a handler by HandlerType, returns true if removed
-		bool remove(const HandlerType& handler)
-		{
-			std::unique_lock lock(m_handlersLocker);
-			auto it = std::find(m_handlers.begin(), m_handlers.end(), handler);
-			if (it != m_handlers.end())
-			{
-				m_handlers.erase(it);
-				return true;
-			}
-			return false;
-		}
-		// Remove a handler by HandlerIdType, returns true if removed
-		bool removeId(const HandlerType::HandlerIdType handlerId)
-		{
-			std::unique_lock lock(m_handlersLocker);
-			auto it = std::find_if(m_handlers.begin(), m_handlers.end(), [handlerId](const HandlerType& h) { return h.id() == handlerId; });
-			if (it != m_handlers.end())
-			{
-				m_handlers.erase(it);
-				return true;
-			}
-			return false;
-		}
-
-		void clear()
-		{
-			std::shared_lock lock(m_handlersLocker);
-			m_handlers.clear();
-		}
-
-		size_t size() const
-		{
-			std::shared_lock lock(m_handlersLocker);
-			return m_handlers.size();
-		}
-
-		bool empty() const
-		{
-			std::shared_lock lock(m_handlersLocker);
-			return m_handlers.empty();
-		}
-
-
-
-		// Call all handlers with the given parameters
-		void call(Args... params) const
-		{
-
-			HandlerCollectionType handlersCopy = getHandlersCopy();
-			callImpl(handlersCopy, params...);
-		}
-		// Call all handlers asynchronously, returns a future
-		std::future<void> callAsync(Args... params) const
-		{
-			HandlerCollectionType handlersCopy = getHandlersCopy();
-			return std::async(std::launch::async, [this, handlersCopy, params...]() {
-				callImpl(handlersCopy, params...);
-				});
-		}
-
-		// Call operator
-		inline void operator()(Args... params) const { call(params...); }
-
-		// Add by HandlerType operator, returns the handler ID
-		// If using with lambda, you must store the id to remove it later. 
-		inline HandlerType::HandlerIdType operator+=(const HandlerType& handler) { return add(handler); }
-
-		// Add by HandlerIdType operator
-		// If using with lambda, you must store the id to remove it later. 
-		inline HandlerType::HandlerIdType operator+=(const HandlerType::HandlerFuncType& handler) { return add(handler); }
-
-		// Remove by HandlerType operator
-		inline bool operator-=(const HandlerType& handler) { return remove(handler); }
-
-		// Remove by HandlerIdType operator
-		inline bool operator-=(const HandlerType::HandlerIdType handlerId) { return removeId(handlerId); }
-
-
-
-
-
-	protected:
-		using HandlerCollectionType = std::vector<HandlerType>;
-
-		void callImpl(const HandlerCollectionType& handlers, Args... params) const
-		{
-			for (const auto& handler : handlers)
-			{
-				handler(params...);
-			}
-		}
-
-		HandlerCollectionType getHandlersCopy() const
-		{
-			std::shared_lock lock(m_handlersLocker);
-
-			// Since the function return value is by copy, 
-			// before the function returns (and destruct the lock_guard object),
-			// it creates a copy of the m_handlers container.
-			return m_handlers;
-		}
-
-	private:
-
-		HandlerCollectionType m_handlers;
-		mutable std::shared_mutex m_handlersLocker;
-	};
-}
+} // namespace utl

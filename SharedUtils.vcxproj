@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -44,9 +44,10 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableASAN>false</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -79,7 +80,7 @@
     <IntDir>$(SolutionDir)intermediates\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
-    <VcpkgEnableManifest>false</VcpkgEnableManifest>
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <VcpkgInstalledDir>$(SolutionDir)libs</VcpkgInstalledDir>
@@ -123,6 +124,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -159,20 +161,26 @@
     <ClInclude Include="include\FixedQueue.h" />
     <ClInclude Include="include\FreeList.h" />
     <ClInclude Include="include\FSReader.h" />
+    <ClInclude Include="include\HeapTracker.h" />
     <ClInclude Include="include\Log.h" />
     <ClInclude Include="include\Logger.h" />
     <ClInclude Include="include\MyNamespace.h" />
     <ClInclude Include="include\Profiler.h" />
     <ClInclude Include="include\RNG.h" />
+    <ClInclude Include="include\SafeQueue.h" />
     <ClInclude Include="include\StackedSliceArray.h" />
     <ClInclude Include="include\Stats.h" />
     <ClInclude Include="include\StringHash.h" />
     <ClInclude Include="include\MemUtils.h" />
     <ClInclude Include="include\Slice.h" />
+    <ClInclude Include="include\StringUtils.h" />
     <ClInclude Include="include\thirdparty\ini.h" />
     <ClInclude Include="include\thirdparty\json.hpp" />
     <ClInclude Include="include\thirdparty\json_fwd.hpp" />
     <ClInclude Include="include\thirdparty\toml.hpp" />
+    <ClInclude Include="include\TimerStats.h" />
+    <ClInclude Include="include\ThreadPool.h" />
+    <ClInclude Include="include\TypeName.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\ConfigFile.cpp" />
@@ -183,6 +191,8 @@
     <ClCompile Include="src\FSNavigator.cpp" />
     <ClCompile Include="src\Log.cpp" />
     <ClCompile Include="src\Logger.cpp" />
+    <ClCompile Include="src\TimerStats.cpp" />
+    <ClCompile Include="src\ThreadPool.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

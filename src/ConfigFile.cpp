@@ -4,195 +4,239 @@
 #include <charconv>
 utl::ConfigFile::ConfigFile(std::string_view filename) : m_filename(filename)
 {
-	// Check for .ini extension
-	if (m_filename.size() < 4 || m_filename.substr(m_filename.size() - 4) != ".ini") {
-		m_filename += ".ini";
-	}
+    // Check for .ini extension
+    if (m_filename.size() < 4 || m_filename.substr(m_filename.size() - 4) != ".ini") {
+        m_filename += ".ini";
+    }
 
 
 }
 
 namespace {
-	static std::pair<std::string, std::string> parseSectionAndKey(std::string_view name) {
-		auto pos = name.find('.');
-		if (pos == std::string_view::npos) {
-			return { "global", std::string(name) };
-		}
-		else {
-			return { std::string(name.substr(0, pos)), std::string(name.substr(pos + 1)) };
-		}
-	}
-
-	static utl::ConfigValueType guessTypeFromString(const std::string& str) {
-		// Check for bool
-		if (str == "true" || str == "false" || str == "1" || str == "0") {
-			return utl::ConfigValueType::Bool;
-		}
-		// Check for int
-		int64_t intValue;
-		auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), intValue);
-		if (ec == std::errc() && ptr == str.data() + str.size()) {
-			return utl::ConfigValueType::Int;
-		}
-		// Check for double
-		double doubleValue;
-		auto [ptr2, ec2] = std::from_chars(str.data(), str.data() + str.size(), doubleValue);
-		if (ec2 == std::errc() && ptr2 == str.data() + str.size()) {
-			return utl::ConfigValueType::Double;
-		}
-		// Default to string
-		return utl::ConfigValueType::String;
-	}
 
 
-	static utl::ConfigValue guessConfigValue(const std::string& value, utl::ConfigValueType& outType) {
-		// Check for bool
-		if (value == "true") {
-			outType = utl::ConfigValueType::Bool;
-			return true;
-		}
-		if (value == "false") {
-			outType = utl::ConfigValueType::Bool;
-			return false;
-		}
+    static std::pair<std::string, std::string> parseSectionAndKey(std::string_view name) {
+        auto pos = name.find('.');
+        if (pos == std::string_view::npos) {
+            return { "global", std::string(name) };
+        }
+        else {
+            return { std::string(name.substr(0, pos)), std::string(name.substr(pos + 1)) };
+        }
+    }
 
-		// Check for int
-		int intVal;
-		auto [ptrInt, ecInt] = std::from_chars(value.data(), value.data() + value.size(), intVal);
-		if (ecInt == std::errc() && ptrInt == value.data() + value.size()) {
-			outType = utl::ConfigValueType::Int;
-			return intVal;
-		}
+    template <typename T>
+    requires std::is_arithmetic_v<T>
+    static bool tryStringToNumber(const std::string& str, T& out) {
+        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), out);
+        return (ec == std::errc() && ptr == str.data() + str.size());
+    }
 
-		// Check for double
-		double doubleVal;
-		auto [ptrDouble, ecDouble] = std::from_chars(value.data(), value.data() + value.size(), doubleVal);
-		if (ecDouble == std::errc() && ptrDouble == value.data() + value.size()) {
-			outType = utl::ConfigValueType::Double;
-			return doubleVal;
-		}
 
-		// Fallback to string
-		outType = utl::ConfigValueType::String;
 
-		return value;
-	}
+    static utl::ConfigValueType guessTypeFromString(const std::string& str) {
+        // Check for bool
+        if (str == "true" || str == "false") {
+            return utl::ConfigValueType::Bool;
+        }
+        // Check for int
+        int64_t intValue;
+        if(tryStringToNumber(str,intValue)) {
+            return utl::ConfigValueType::Int;
+        }
+        // Check for double
+        double doubleValue;
+        if (tryStringToNumber(str, doubleValue)) {
+            return utl::ConfigValueType::Double;
+        }
+        // Default to string
+        return utl::ConfigValueType::String;
+    }
+
+
+
+
+    static utl::ConfigValue guessConfigValue(const std::string& value, utl::ConfigValueType& outType) {
+        // Check for bool
+        if (value == "true") {
+            outType = utl::ConfigValueType::Bool;
+            return true;
+        }
+        if (value == "false") {
+            outType = utl::ConfigValueType::Bool;
+            return false;
+        }
+
+        // Check for int
+        int64_t intValue;
+        if (tryStringToNumber(value, intValue)) {
+            outType= utl::ConfigValueType::Int;
+            return intValue;
+        }
+        // Check for double
+        double doubleValue;
+        if (tryStringToNumber(value, doubleValue)) {
+            outType= utl::ConfigValueType::Double;
+            return doubleValue;
+        }
+
+        // Fallback to string
+        outType = utl::ConfigValueType::String;
+
+        return value;
+    }
+
+
+
+    // Get inner configValue configValueType
+
+
+
+
+
+
 }
 void utl::ConfigFile::save()
 {
-	mINI::INIFile file(m_filename);
-	mINI::INIStructure ini;
-	for (const auto& [hash, info] : m_valueInfoMap) {
-		if (info.flags.has(ConfigFlagBits::archive)) {
-			// Save this value
-			const auto& value = m_values[info.index];
-			std::string strValue;
-			switch (info.type) {
-			case ConfigValueType::Bool:
-				strValue = std::get<bool>(value) ? "true" : "false";
-				break;
-			case ConfigValueType::Int:
-				strValue = std::to_string(std::get<int64_t>(value));
-				break;
-			case ConfigValueType::Double:
-				strValue = std::to_string(std::get<double>(value));
-				break;
-			case ConfigValueType::String:
-				strValue = std::get<std::string>(value);
-				break;
-			default:
-				continue; // unknown type
-			}
-			auto&& [section, key] = parseSectionAndKey(info.name);
-			// For simplicity, use a default section
-			ini[section][key] = strValue;
-		}
-	}
-	file.write(ini);
+    mINI::INIFile file(m_filename);
+    mINI::INIStructure ini;
+    for (auto&& [value,inital, info] : m_values) {
+        if (info->flags.has(ConfigFlagBits::archive)) {        
+            auto&& [section, key] = parseSectionAndKey(info->name);
+            ini[section][key] = utl::details::toString(value);
+        }
+    }
+    file.write(ini);
 }
 
 
 void utl::ConfigFile::load()
 {
-	mINI::INIFile file(m_filename);
-	mINI::INIStructure ini;
+    auto loadCreateValue = [this](std::string_view name, const ConfigValue& defaultValue) {
+        m_values.emplace_back(defaultValue, defaultValue, nullptr);
+        size_t index = m_values.size() - 1;
+        m_valueInfoMap[StringHash(name)] = { index, details::valueTypeFromVariant(defaultValue), details::g_defaultConfigFlags, std::string(name) };
+        auto& storage = m_values[index];
+        storage.info= &m_valueInfoMap[StringHash(name)];
+        };
 
-	// Check if string has . or e or E 
-	inline auto hasFloatMarkers = [](const std::string& s) {
-		return s.find_first_of(".eE") != std::string::npos;
-		};
+    mINI::INIFile file(m_filename);
+    mINI::INIStructure ini;
+    if (file.read(ini)) {
+        std::unique_lock lock(m_mutex);
+        for (auto const& it : ini) {
+            auto const& section = it.first;
+            for (auto&& [key,value] : it.second) {
+                utl::ConfigValueType guessedType;
+                auto guessedValue = guessConfigValue(value, guessedType);
+                // Check if key exists
+                auto sectionKey = section + "." + key;
+                if (auto vit = m_valueInfoMap.find(StringHash(sectionKey)); vit != m_valueInfoMap.end()) {
+                    auto& info = vit->second;
 
-
-
-	if (file.read(ini)) {
-		std::unique_lock lock(m_mutex);
-
-		for (auto const& it : ini) {
-			auto const& section = it.first;
-
-
-			for (auto const& key : it.second) {
-				// We should check:
-				// 1. Guess type and value from string
-				// 2. See if key exists
-				// 3. If it exists, check type matches guess
-				// 4. If it matches, set value
-				// 5. If it does not match, try to convert
-				// 6. 
-				// 1. If the key exists in m_valueInfoMap
-				// 2. If the type matches
-				// 3. If not, try to guess the type and convert
-				// 4. If it fails or has no value, skip it
-				// 5. If it succeeds, set the value
-				// 6. If the key does not exist, create it with guessed type
-
-
-				utl::ConfigValueType guessedType;
-				auto guessedValue = guessConfigValue(key.second, guessedType);
-
-				if (auto vit = m_valueInfoMap.find(StringHash(section + "." + key.first)); vit != m_valueInfoMap.end()) {
-					auto& info = vit->second;
-
-					if (info.index >= m_values.size()) {
-						logError("ConfigFile::load - invalid index for key " + section + "." + key.first);
-						continue;
-					}; // corrupted index
-
-					auto& value = m_values[info.index];
-
-					if (info.type == guessedType) {
-						// Types match, just set the value
-						value = guessedValue;
-						continue;
-					}
-					logError("ConfigFile::load - type mismatch for key " + section + "." + key.first + ", expected " + toString(info.type) + ", got " + toString(guessedType) + ", attempting conversion");
-				}
-				// Key not found
-				createValue(section + "." + key.first, guessedValue, ConfigFlagBits::archive);
-
-
-			}
-		}
-
-
-	}
-
-
+                    if (info.index >= m_values.size()) {
+                        LOG_ERROR("ConfigFile::load - invalid index for key {}.{}", section,".",key);
+                        continue;
+                    };
+                    if (info.type != guessedType) {
+                        LOG_ERROR("ConfigFile::load - type mismatch for key {}.{}, expected {}, got {}", section, key,  utl::details::toString(info.type), utl::details::toString(guessedType));
+                        continue;
+                    }
+                    auto& storage = m_values[info.index];
+                    storage.current = std::move(guessedValue);
+                    continue;
+                }
+                // Else create new value
+                loadCreateValue(sectionKey, guessedValue);
+            }
+        }
+    }
 }
 
-size_t utl::ConfigFile::createValue(std::string_view name, const ConfigValue& defaultValue, const ConfigValueType& type, ConfigFlags flags)
+bool utl::ConfigFile::hasValue(StringHash hash) const noexcept
 {
-	std::unique_lock lock(m_mutex);
-	m_values.emplace_back(defaultValue);
-	size_t index = m_values.size();
-	// Determine type from variant
-	m_valueInfoMap[StringHash(name)] = { index, type, flags, std::string(name) };
-	return index;
+    std::shared_lock lock(m_mutex);
+    return m_valueInfoMap.contains(hash);
 }
+
+
 
 size_t utl::ConfigFile::createValue(std::string_view name, const ConfigValue& defaultValue, ConfigFlags flags)
 {
-	return size_t();
+    std::unique_lock lock(m_mutex);
+    // If already exists, return existing index
+    if (auto it = m_valueInfoMap.find(StringHash(name)); it != m_valueInfoMap.end()) {
+        if (it->second.flags.has(ConfigFlagBits::uninitalized)) {
+            it->second.flags = flags.without(ConfigFlagBits::uninitalized);
+            m_values[it->second.index].initial = defaultValue;
+        }
+        return it->second.index;
+    }
+
+    m_values.emplace_back(defaultValue,defaultValue,nullptr);
+    size_t index = m_values.size()-1;
+    m_valueInfoMap[StringHash(name)] = { index, details::valueTypeFromVariant(defaultValue), flags, std::string(name) };
+    m_values[index].info = &m_valueInfoMap[StringHash(name)];
+    return size_t();
+}
+
+bool utl::ConfigFile::getValue(StringHash hash, ConfigValue& out) const
+{
+    std::shared_lock lock(m_mutex);
+    auto it = m_valueInfoMap.find(hash);
+    if (it == m_valueInfoMap.end()) return false; // not found
+    const size_t idx = it->second.index;
+    if (idx >= m_values.size()) return false; // corrupted index
+    out = m_values[idx].current;
+    return true;
+}
+
+bool utl::ConfigFile::getValue(size_t index, ConfigValue& out) const
+{
+    std::shared_lock lock(m_mutex);
+    if (index >= m_values.size()) return false;
+    out = m_values[index].current;
+    return true;
+}
+
+
+
+bool utl::ConfigFile::setValue(StringHash name, const ConfigValue& value)
+{
+    std::unique_lock lock(m_mutex);
+    if (auto it = m_valueInfoMap.find(name); it != m_valueInfoMap.end()) {
+        if (it->second.flags.has(ConfigFlagBits::readonly)) {
+            return false; // readonly
+        }
+        const size_t idx = it->second.index;
+        if (idx >= m_values.size()) return false; // corrupted index
+        auto newType = details::valueTypeFromVariant(value);
+        if (it->second.type != newType) return false;
+        m_values[idx].current = value;
+        return true;
+    }
+    return false;
+    
+}
+
+bool utl::ConfigFile::setValue(size_t index, const ConfigValue& value)
+{
+    std::unique_lock lock(m_mutex);
+    if (index >= m_values.size()) return false;
+    // Check readonly flag
+    for (const auto& [hash, info] : m_valueInfoMap) {
+        if (info.index == index) {
+            if (info.flags.has(ConfigFlagBits::readonly)) {
+                return false; // readonly
+            }
+            // Type check
+            ConfigValueType expected = details::valueTypeFromVariant(value);
+            if (info.type != expected) return false;
+            m_values[index].current = value;
+            return true;
+        }
+    }
+    return false; // index not found in info map
 }
 
 

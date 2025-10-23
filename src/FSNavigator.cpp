@@ -12,8 +12,13 @@ FSNavigator::FSNavigator(std::filesystem::path path) : currentPath(std::move(pat
 
 void FSNavigator::update()
 {
-	if (!fs::exists(currentPath) || !fs::is_directory(currentPath)) {
-		throw std::runtime_error("Invalid directory path");
+	fs::path fullPath = currentPath;
+	if (!currentPath.is_absolute()) {
+		fullPath = fs::current_path() / currentPath;
+	}
+
+	if (!fs::exists(fullPath) || !fs::is_directory(fullPath)) {
+		throw std::runtime_error("Invalid directory path: " + fullPath.string());
 	}
 	files.clear();
 	folders.clear();
@@ -39,7 +44,7 @@ bool FSNavigator::goToParent()
 bool FSNavigator::goToFolder(const std::filesystem::path& folder)
 {
 	if (containsFolder(folder)) {
-		currentPath = folder;
+		currentPath /= folder;
 		update();
 		return true;
 	};

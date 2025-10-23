@@ -1,8 +1,9 @@
 ﻿#pragma once
-#include <string_view>
-#include <string>
+#include <array>
 #include <format>
 #include <iostream>
+#include <string>
+#include <string_view>
 
 
 //EMU or Emu : EasedMango Utilities / Easy My Utils
@@ -27,7 +28,7 @@
 
 
 
-namespace EMU::Stuff{}
+
 namespace utl{
 template <typename... Args>
 void Print(const std::string_view &fmt, Args &&...args)
