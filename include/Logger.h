@@ -1,59 +1,57 @@
 ﻿#pragma once
 #include "Log.h"
-#include <thread>
-#include <queue>
 #include <condition_variable>
-#include <mutex>
 #include <future>
+#include <mutex>
 #include <ostream>
+#include <queue>
+#include <thread>
 
 #include "FixedQueue.h"
 
 
 namespace	Debug {
 
-	//How many logs could a logger log if a logger could log logs
-	class Logger
-	{
-	private:
+    //How many logs could a logger log if a logger could log logs
+    class Logger
+    {
+    public:
+        Logger(const Logger&) = delete;
+        Logger(Logger&&) = delete;
+        Logger& operator=(const Logger&) = delete;
+        Logger& operator=(Logger&&) = delete;
 
-		std::thread thread;
-		std::atomic_bool running = true;
-		std::mutex mtx;
-		FixedQueue<Log,1024> messageQueue;
-		FixedQueue<Log,1024> tempQueue;
-		std::condition_variable cv;
-		std::atomic<int> pendingMessages = 0;
-		std::promise<void> readyPromise;
-		std::shared_future<void> readyFuture;
-
-		Logger();
-		~Logger();
-
-		void runAsync();
-
-	public:
-		Logger(const Logger&) = delete;
-		Logger(Logger&&) = delete;
-		Logger& operator=(const Logger&) = delete;
-		Logger& operator=(Logger&&) = delete;
-
-		static Logger& Instance()
-		{
-			static Logger logger;
-			return logger;
-		}
+        static Logger& Instance()
+        {
+            static Logger logger;
+            return logger;
+        }
 
 
-		bool isEmpty();
-		void addLog(const Log& log);
-		void dump();
-		void flush();
-		void waitForReady();
-		void waitForReady() const;
+        bool isEmpty();
+        void addLog(const Log& log);
+        void dump();
+        void flush();
+        void waitForReady();
+        void waitForReady() const;
+        void setLogMask(Log::TypeFlags mask);
+    private:
+        Log::TypeFlags logMask;
+        std::thread thread;
+        std::atomic_bool running = true;
+        std::mutex mtx;
+        utl::FixedQueue<Log,1024> messageQueue;
+        utl::FixedQueue<Log,1024> tempQueue;
+        std::condition_variable cv;
+        std::atomic_size_t pendingMessages = 0;
+        std::promise<void> readyPromise;
+        std::shared_future<void> readyFuture;
 
+        Logger();
+        ~Logger();
 
-	};
-	void PrintOut(Debug::Log& log, std::ostream& stream);
-	void StreamLogType(std::basic_ostream<char>& stream, Debug::Log::Type type);
+        void runAsync();
+    };
+    void PrintOut(Debug::Log& log, std::ostream& stream);
+    constexpr std::string_view StreamLogType(Debug::Log::Type type) noexcept;
 };
